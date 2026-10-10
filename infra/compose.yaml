@@ -1,0 +1,42 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: volvox
+      POSTGRES_USER: volvox
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the shell environment}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U volvox -d volvox"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [backend]
+  api:
+    build:
+      context: ../services/api
+    environment:
+      VOLVOX_ENVIRONMENT: ${VOLVOX_ENVIRONMENT:-development}
+      VOLVOX_DATABASE_URL: postgresql+psycopg://volvox:${POSTGRES_PASSWORD}@postgres:5432/volvox
+      VOLVOX_APP_SECRET: ${VOLVOX_APP_SECRET:?Set VOLVOX_APP_SECRET}
+      VOLVOX_OLLAMA_BASE_URL: http://ollama:11434/v1
+      VOLVOX_API_BIND_HOST: 0.0.0.0
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [backend]
+  ollama:
+    image: ollama/ollama:latest
+    profiles: [inference]
+    volumes:
+      - ollama_data:/root/.ollama
+    networks: [backend]
+volumes:
+  postgres_data:
+  ollama_data:
+networks:
+  backend:
+    internal: true

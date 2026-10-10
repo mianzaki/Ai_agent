@@ -1,0 +1,8 @@
+# Local speech stack for the existing Python 3.12 .venv312 environment.
+-r requirements-tts.txt
+faster-whisper==1.2.1
+# PyAV 19.0.1's Windows resampler DLL is denied by this machine's app-control
+# policy; 16.0.0 has a Windows CPython 3.12 wheel and imports successfully.
+av==16.0.0
+sounddevice==0.5.6
+# Pipecat 1.12.0 bundles SileroVADAnalyzer and its ONNX model; no extra VAD package.

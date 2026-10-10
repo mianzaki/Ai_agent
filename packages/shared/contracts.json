@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://volvox.invalid/contracts/session-event-v1.json",
+  "title": "Volvox session event",
+  "type": "object",
+  "required": ["organization_id", "session_id", "sequence", "kind", "payload"],
+  "properties": {
+    "organization_id": {"type": "string", "format": "uuid"},
+    "session_id": {"type": "string", "format": "uuid"},
+    "sequence": {"type": "integer", "minimum": 0},
+    "kind": {"type": "string", "maxLength": 64},
+    "payload": {"type": "object"}
+  },
+  "additionalProperties": false
+}

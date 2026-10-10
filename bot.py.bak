@@ -1,0 +1,76 @@
+import asyncio
+
+from pipecat.frames.frames import (
+    LLMContextFrame,
+    LLMTextFrame,
+    LLMFullResponseEndFrame,
+    EndFrame,
+)
+from pipecat.pipeline.pipeline import Pipeline
+from pipecat.pipeline.runner import PipelineRunner
+from pipecat.pipeline.task import PipelineTask
+from pipecat.processors.frame_processor import FrameProcessor
+from pipecat.processors.aggregators.llm_context import LLMContext
+from pipecat.services.ollama.llm import OLLamaLLMService
+
+
+class PrintResponse(FrameProcessor):
+    async def process_frame(self, frame, direction):
+        await super().process_frame(frame, direction)
+
+        if isinstance(frame, LLMTextFrame):
+            print(frame.text, end="", flush=True)
+
+        if isinstance(frame, LLMFullResponseEndFrame):
+            print("\n\nAI response complete!")
+
+        await self.push_frame(frame, direction)
+
+
+async def main():
+    print("Starting Volvox AI Agent...")
+
+    llm = OLLamaLLMService(
+        settings=OLLamaLLMService.Settings(
+            model="llama3.2:3b"
+        ),
+        base_url="http://localhost:11434/v1",
+    )
+
+    context = LLMContext([
+        {
+            "role": "system",
+            "content": "You are a friendly AI receptionist for Volvox Solutions."
+        },
+        {
+            "role": "user",
+            "content": "Hello! Introduce yourself in two sentences."
+        },
+    ])
+
+    pipeline = Pipeline([
+        llm,
+        PrintResponse(),
+    ])
+
+    task = PipelineTask(pipeline)
+    runner = PipelineRunner()
+
+    async def send_prompt():
+        await asyncio.sleep(1)
+        print("Sending prompt to Ollama...")
+
+        await task.queue_frame(LLMContextFrame(context))
+
+        await asyncio.sleep(30)
+        await task.queue_frame(EndFrame())
+
+    asyncio.create_task(send_prompt())
+
+    await runner.run(task)
+
+    print("\nAgent finished.")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

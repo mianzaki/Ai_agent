@@ -1,0 +1,4 @@
+# Optional local TTS dependencies for the Python 3.12 environment.
+-r requirements.txt
+kokoro-onnx==0.5.0
+requests==2.34.2
