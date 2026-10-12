@@ -8,6 +8,15 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $runtimeDir = Join-Path $root ".volvox-runtime"
 New-Item -ItemType Directory -Force -Path $runtimeDir | Out-Null
+$kokoroModel = Join-Path $root "models\kokoro-v1.0.onnx"
+$kokoroVoices = Join-Path $root "models\voices-v1.0.bin"
+if (-not (Test-Path -LiteralPath $kokoroModel) -or -not (Test-Path -LiteralPath $kokoroVoices)) {
+    throw "Kokoro model assets are missing from models/. Restore kokoro-v1.0.onnx and voices-v1.0.bin before starting Volvox."
+}
+$whisperCache = Join-Path $root "models\whisper"
+if (-not (Test-Path -LiteralPath $whisperCache) -or -not (Get-ChildItem -LiteralPath $whisperCache -Recurse -File -Filter "model.bin" -ErrorAction SilentlyContinue | Select-Object -First 1)) {
+    Write-Warning "The local Whisper base.en checkpoint is missing. Voice Conversation will report unavailable until it is installed."
+}
 
 function Test-LocalPort([int]$Port) {
     $client = [System.Net.Sockets.TcpClient]::new()
@@ -71,6 +80,7 @@ if (-not $apiListening) {
     $env:VOLVOX_API_BIND_PORT = "8000"
     $env:VOLVOX_OLLAMA_HOST = "http://127.0.0.1:11434"
     $env:VOLVOX_CHAT_MODEL = "llama3.2:3b"
+    $env:VOLVOX_VOICE_LOG_PATH = Join-Path $runtimeDir "voice-runtime.log"
     Start-VolvoxProcess "api" $python @("-m", "uvicorn", "app.main:app", "--app-dir", "services/api", "--host", "127.0.0.1", "--port", "8000") $root
     $deadline = (Get-Date).AddSeconds(60)
     $apiReady = $false
@@ -95,10 +105,14 @@ if (-not $NoDashboard) {
         $cmd = $env:ComSpec
         $env:VOLVOX_LOCAL_DEV = "true"
         $env:VOLVOX_API_URL = "http://127.0.0.1:8000"
-        Start-VolvoxProcess "dashboard" $cmd @("/d", "/c", "npm.cmd run dev -- --hostname 127.0.0.1") $webDir
+        Start-VolvoxProcess "dashboard" $cmd @("/d", "/c", "npm.cmd run dev") $webDir
         $deadline = (Get-Date).AddSeconds(45)
-        do { Start-Sleep -Milliseconds 500 } while (-not (Test-LocalPort 3000) -and (Get-Date) -lt $deadline)
-        if (-not (Test-LocalPort 3000)) { throw "Next.js did not open port 3000. Check .volvox-runtime/dashboard.err.log." }
+        $dashboardReady = $false
+        do {
+            Start-Sleep -Milliseconds 500
+            try { $dashboardReady = $null -ne (Invoke-RestMethod -Uri "http://127.0.0.1:3000/api/status" -TimeoutSec 2).api } catch { }
+        } while (-not $dashboardReady -and (Get-Date) -lt $deadline)
+        if (-not $dashboardReady) { throw "Next.js did not become ready. Check .volvox-runtime/dashboard.err.log." }
     } else { Write-Host "Dashboard is already listening at http://127.0.0.1:3000" }
 }
 

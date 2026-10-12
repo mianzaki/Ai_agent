@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { directLocalApi } from "@/lib/server-api";
 
-type Services = { api: string; database: string; ollama: string; voice: string; supabase: "not_configured" };
+type Services = { api: string; database: string; ollama: string; voice: string; voice_transport: string; supabase: "not_configured" };
 
 export async function GET() {
   const localDevelopment = process.env.NODE_ENV !== "production" && process.env.VOLVOX_LOCAL_DEV === "true";
@@ -16,6 +16,6 @@ export async function GET() {
     const services = await response.json() as Omit<Services, "supabase">;
     return NextResponse.json({ ...services, supabase: "not_configured", preview: false });
   } catch {
-    return NextResponse.json({ api: "unavailable", database: "unavailable", ollama: "unavailable", voice: "unavailable", supabase: "not_configured", preview: true });
+    return NextResponse.json({ api: "unavailable", database: "unavailable", ollama: "unavailable", voice: "unavailable", voice_transport: "unavailable", supabase: "not_configured", preview: true });
   }
 }

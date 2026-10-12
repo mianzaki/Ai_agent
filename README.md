@@ -1,5 +1,7 @@
 # Volvox voice agent
 
+For the current local microphone conversation setup, verification results, troubleshooting, and production limits, see [Voice Conversation](docs/VOICE_CONVERSATION.md).
+
 This repository keeps the original Windows local agent runnable while adding a local FastAPI control plane and a Next.js dashboard foundation. The API and dashboard are not production-ready: deployment hardening, secret lifecycle, rate limiting, external identity provisioning, monitoring, and restore drills remain necessary.
 
 ## Existing voice prototype (Windows)
@@ -41,7 +43,7 @@ ollama serve
 ollama pull llama3.2:3b
 ```
 
-The Voice Studio uses `POST /v1/organizations/{organization_id}/speech` and returns `audio/wav`; typed chat uses local Ollama at `http://127.0.0.1:11434`. No microphone or media transport is used.
+The Voice Studio uses `POST /v1/organizations/{organization_id}/speech` and returns `audio/wav`; typed chat uses local Ollama at `http://127.0.0.1:11434`. Voice Conversation uses a ticketed local WebSocket for browser microphone audio. See [the voice conversation guide](docs/VOICE_CONVERSATION.md) for its status and limits.
 
 Health routes: `GET /health/live` and `GET /health/ready`. Readiness performs `SELECT 1` and returns 503 when the configured database is unreachable. Copy `.env.example` to `services/api/.env` and fill local PostgreSQL credentials before starting. For local iteration without Docker, set `VOLVOX_DATABASE_URL` to an absolute SQLite URL, for example `sqlite:///C:/Users/you/volvox-local.db`; SQLite is for local development only. Alembic reads `VOLVOX_DATABASE_URL` directly when provided.
 

@@ -339,6 +339,25 @@ button { cursor: pointer; }
 .studio-empty-art span { animation: none; }
 .sidebar .brand { text-decoration: none; color: inherit; }
 [data-theme="dark"] .studio-field > input:not([type=range]),[data-theme="dark"] .studio-field > textarea,[data-theme="dark"] .chat-options select { background: #222336; color: #e0deed; border-color: #34364a; }
+/* Local microphone conversation */
+.conversation-layout { display: grid; grid-template-columns: minmax(280px, 360px) minmax(0, 1fr); gap: 16px; align-items: start; }
+.conversation-controls,.conversation-transcript { min-width: 0; }
+.conversation-controls h2,.conversation-transcript h2 { margin: 0 0 12px; font-size: 18px; }
+.conversation-controls p,.conversation-transcript > p { color: var(--muted); font-size: 12px; line-height: 1.6; }
+.conversation-controls .studio-field { margin: 18px 0; }
+.conversation-check { display: flex; align-items: center; gap: 9px; color: var(--ink); font-size: 12px; line-height: 1.5; }
+.conversation-check input { accent-color: #7563df; }
+.conversation-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.conversation-actions .btn { min-height: 38px; }
+.conversation-state { margin: 18px 0 4px; text-transform: capitalize; font-weight: 600; }
+.conversation-audio { display: block; width: 100%; margin: 12px 0; }
+.conversation-transcript { min-height: 400px; }
+.conversation-line { padding: 12px 0; border-top: 1px solid var(--line); }
+.conversation-line b { color: #7362c9; font-size: 11px; }
+.conversation-line p { margin: 6px 0 0; color: var(--ink); font-size: 12px; line-height: 1.6; white-space: pre-wrap; }
+.mobile-navigation { display: none; }
+@media (max-width: 760px) { .conversation-layout { grid-template-columns: 1fr; } }
+@media (max-width: 560px) { .mobile-navigation { display: flex; gap: 5px; overflow-x: auto; padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--panel); } .mobile-navigation button { flex: none; padding: 9px 10px; border: 0; border-radius: 8px; color: var(--muted); background: transparent; font-size: 11px; } .mobile-navigation button.active { color: #6654ca; background: #7665df1c; font-weight: 700; } }
 @media(max-width:900px) { .agents-layout,.settings-grid { grid-template-columns: 1fr; } .agents-layout > .section-card:first-child { grid-row: auto; } }
 @media(max-width:600px) { .agents-layout .preset-grid { grid-template-columns: 1fr; } .agents-layout .preset-save .studio-controls { grid-template-columns: 1fr; } .content { padding: 22px 16px 36px; } .topbar { padding: 0 16px; } .chat-options { justify-content: flex-start; } }
 

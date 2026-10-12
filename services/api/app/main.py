@@ -17,6 +17,7 @@ from app.logging_config import configure_logging
 from app.models import Base, Membership, Organization, User
 from app.routes import router
 from app.settings import get_settings
+from app.voice_conversation import router as voice_router
 
 settings = get_settings()
 configure_logging(settings.log_level)
@@ -62,6 +63,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(title="Volvox API", version="0.1.0", lifespan=lifespan)
 app.state.engine_factory = create_database_engine
 app.include_router(router)
+app.include_router(voice_router)
 
 
 @app.middleware("http")
@@ -112,6 +114,8 @@ async def ready() -> dict[str, str] | Response:
 async def services() -> dict[str, str]:
     kokoro = getattr(app.state, "kokoro", None)
     voice = "connected" if kokoro is not None and bool(kokoro.voices) else "unavailable"
+    whisper_cache = Path(__file__).resolve().parents[3] / "models" / "whisper"
+    voice_transport = "configured" if settings.environment == "development" and settings.local_dev_auth_bypass and voice == "connected" and any(whisper_cache.rglob("model.bin")) else "unavailable"
     try:
         import httpx
 
@@ -127,4 +131,5 @@ async def services() -> dict[str, str]:
         "database": "connected" if getattr(app.state, "database_ready", False) else "not_configured",
         "ollama": ollama,
         "voice": voice,
+        "voice_transport": voice_transport,
     }

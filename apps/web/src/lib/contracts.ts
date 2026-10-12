@@ -23,7 +23,7 @@ export type AgentCreate = {
 
 export type AgentUpdate = Partial<AgentCreate>;
 
-export type ServiceState = "connected" | "not_configured" | "unavailable";
+export type ServiceState = "connected" | "configured" | "not_configured" | "unavailable";
 
 export type DashboardData = {
   mode: "connected" | "preview";
@@ -36,6 +36,7 @@ export type DashboardData = {
     ollama: ServiceState;
     apiAuthenticated?: boolean | null;
     voice: ServiceState;
+    voice_transport?: ServiceState;
   };
 };
 

@@ -89,12 +89,12 @@ class WavWriter(FrameProcessor):
                 self._wav = None
 
 
-async def run_agent(prompt: str, *, tts_enabled: bool = False, output_wav: Path = ROOT / "artifacts" / "volvox-response.wav", voice: str = "af_sarah", history: list[dict[str, str]] | None = None) -> tuple[str, WavWriter | None]:
+async def run_agent(prompt: str, *, tts_enabled: bool = False, output_wav: Path = ROOT / "artifacts" / "volvox-response.wav", voice: str = "af_sarah", history: list[dict[str, str]] | None = None, system_instruction: str = "You are a friendly AI receptionist for Volvox Solutions.", handle_signals: bool = True) -> tuple[str, WavWriter | None]:
     """Run one bounded-context response using Pipecat 1.12.0 worker APIs."""
     response_done = asyncio.Event()
     response_parts: list[str] = []
     started = asyncio.Event()
-    llm = OLLamaLLMService(settings=OLLamaLLMService.Settings(model=MODEL, system_instruction="You are a friendly AI receptionist for Volvox Solutions."), base_url=OLLAMA_BASE_URL)
+    llm = OLLamaLLMService(settings=OLLamaLLMService.Settings(model=MODEL, system_instruction=system_instruction), base_url=OLLAMA_BASE_URL)
     messages = [
         {"role": item["role"], "content": item["content"][-4000:]}
         for item in (history or [])[-(MAX_HISTORY_TURNS * 2):]
@@ -114,7 +114,7 @@ async def run_agent(prompt: str, *, tts_enabled: bool = False, output_wav: Path 
         processors.extend([tts, writer])
 
     worker = PipelineWorker(Pipeline(processors), idle_timeout_secs=None)
-    runner = WorkerRunner()
+    runner = WorkerRunner(handle_sigint=handle_signals, handle_sigterm=False)
 
     @worker.event_handler("on_pipeline_started")
     async def send_prompt(_worker, _frame):

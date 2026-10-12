@@ -1,6 +1,6 @@
 # Volvox dashboard
 
-The local dashboard has four sections: Voice Studio, AI Chat + Voice, Agents, and Settings. It has no sign-in/sign-up screen for personal localhost development. Text-to-speech uses the installed Kokoro voices; typed chat uses local Ollama.
+The local dashboard has four sections: Voice Conversation, Voice Studio, AI Agents, and Settings. AI Chat + Voice is a tab within Voice Studio. It has no sign-in/sign-up screen for personal loopback development. Text-to-speech uses the installed Kokoro voices; typed chat uses local Ollama. Voice Conversation uses a ticketed WebSocket and browser microphone access; see [the voice conversation guide](../../docs/VOICE_CONVERSATION.md).
 
 ## Start on Windows
 

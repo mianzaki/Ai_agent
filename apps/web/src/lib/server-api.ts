@@ -49,6 +49,8 @@ export const serverApi = {
       `/v1/organizations/${encodeURIComponent(organizationId)}/agents/${encodeURIComponent(agentId)}`,
       { method: "DELETE" },
     ),
+  voiceSession: (organizationId: string, agentId: string) =>
+    request<{ url: string; expires_in: string }>(`/v1/organizations/${encodeURIComponent(organizationId)}/voice-session?agent_id=${encodeURIComponent(agentId)}`, { method: "POST" }),
 };
 
 export async function directLocalApi(path: string, init?: RequestInit): Promise<Response> {
@@ -59,21 +61,24 @@ export async function directLocalApi(path: string, init?: RequestInit): Promise<
   return fetch(`${API_URL}${path}`, {
     ...init,
     cache: "no-store",
-    headers: { authorization: "Bearer local-development", ...init?.headers },
+    headers: { authorization: "Bearer local-development", ...(typeof init?.body === "string" ? { "content-type": "application/json" } : {}), ...init?.headers },
   });
 }
 
 export function isSameOrigin(request: NextRequest): boolean {
   const origin = request.headers.get("origin");
-  if (!origin) return true;
+  if (!origin) return false;
   try {
-    const requestOrigin = new URL(origin).origin;
-    const forwardedProtocol = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
-    const protocol = forwardedProtocol ? `${forwardedProtocol}:` : request.nextUrl.protocol;
+    const parsed = new URL(origin);
+    if (parsed.origin !== origin || !["http:", "https:"].includes(parsed.protocol)) return false;
     const host = request.headers.get("host");
-    const candidates = new Set([request.url ? new URL(request.url).origin : "", request.nextUrl.origin]);
-    if (protocol && host) candidates.add(new URL(`${protocol}//${host}`).origin);
-    return candidates.has(requestOrigin);
+    if (process.env.NODE_ENV !== "production" && process.env.VOLVOX_LOCAL_DEV === "true") {
+      return host === "127.0.0.1:3000" && origin === "http://127.0.0.1:3000";
+    }
+    if (!host) return false;
+    const forwardedProtocol = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
+    const protocol = forwardedProtocol && ["http", "https"].includes(forwardedProtocol) ? `${forwardedProtocol}:` : request.nextUrl.protocol;
+    return origin === new URL(`${protocol}//${host}`).origin;
   } catch {
     return false;
   }
