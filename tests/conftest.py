@@ -83,6 +83,13 @@ def api_client(test_db: DbSession, identities):
     users, _orgs, _agents = identities
     app.dependency_overrides[get_db_session] = lambda: test_db
     app.state.engine_factory = lambda _settings: test_db.get_bind()
+    class StubKokoro:
+        voices = ["af_sarah", "am_michael"]
+
+        def synthesize(self, text, voice, language, speed):
+            return b"RIFF\x00\x00\x00\x00WAVEfmt ", 24000
+
+    app.state.kokoro = StubKokoro()
     app.dependency_overrides[get_current_identity] = lambda: Identity(
         subject=users[0].auth_subject, claims={"sub": users[0].auth_subject}
     )
@@ -98,6 +105,13 @@ def authenticated_client(test_db: DbSession, identities):
     users, _orgs, _agents = identities
     app.dependency_overrides[get_db_session] = lambda: test_db
     app.state.engine_factory = lambda _settings: test_db.get_bind()
+    class StubKokoro:
+        voices = ["af_sarah", "am_michael"]
+
+        def synthesize(self, text, voice, language, speed):
+            return b"RIFF\x00\x00\x00\x00WAVEfmt ", 24000
+
+    app.state.kokoro = StubKokoro()
     app.dependency_overrides[get_current_identity] = lambda: Identity(
         subject=users[0].auth_subject, claims={"sub": users[0].auth_subject}
     )

@@ -138,3 +138,28 @@ def test_request_id_is_preserved_and_malformed_request_id_replaced(
     assert accepted.headers["x-request-id"] == "trace-123"
     assert replaced.headers["x-request-id"] != "bad\r\nid"
     uuid.UUID(replaced.headers["x-request-id"])
+
+
+def test_speech_requires_member_and_returns_wav(authenticated_client, identities):
+    _users, orgs, _agents = identities
+    own, other = orgs
+    denied = authenticated_client.post(f"/v1/organizations/{other.id}/speech", json={"text": "Hello"})
+    assert denied.status_code == 404
+    response = authenticated_client.post(
+        f"/v1/organizations/{own.id}/speech",
+        json={"text": "Hello", "voice_id": "af_sarah", "language": "en-us", "speed": 1.0},
+    )
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "audio/wav"
+    assert response.content.startswith(b"RIFF")
+
+
+def test_voice_settings_are_tenant_scoped_and_validate_installed_voice(authenticated_client, identities):
+    _users, orgs, _agents = identities
+    own, other = orgs
+    assert authenticated_client.get(f"/v1/organizations/{other.id}/voice-settings").status_code == 404
+    bad = authenticated_client.put(
+        f"/v1/organizations/{own.id}/voice-settings",
+        json={"voice_id": "not-installed", "language": "en-us", "speed": 1.0},
+    )
+    assert bad.status_code == 422

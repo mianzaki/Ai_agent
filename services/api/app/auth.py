@@ -102,6 +102,8 @@ def get_current_identity(
     settings: Settings = Depends(get_settings),
 ) -> Identity:
     authorization = request.headers.get("authorization", "")
+    if settings.environment == "development" and settings.local_dev_auth_bypass and request.client and request.client.host in {"127.0.0.1", "::1", "testclient"}:
+        return Identity(subject="local-development", claims={"sub": "local-development"})
     scheme, _, token = authorization.partition(" ")
     if scheme.lower() != "bearer" or not token:
         raise HTTPException(

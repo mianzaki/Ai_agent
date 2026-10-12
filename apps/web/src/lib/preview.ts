@@ -25,5 +25,5 @@ export const previewDashboard: DashboardData = {
   mode: "preview",
   organizations: [{ id: "preview-workspace", name: "Preview workspace", created_at: "2026-10-01T00:00:00Z" }],
   agents: previewAgents,
-  services: { api: "not_configured", database: "not_configured", supabase: "not_configured", voice: "not_configured" },
+  services: { api: "not_configured", database: "not_configured", supabase: "not_configured", ollama: "not_configured", voice: "not_configured" },
 };

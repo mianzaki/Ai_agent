@@ -16,12 +16,32 @@ The local Ollama server and `llama3.2:3b` model must be installed. Do not expose
 
 ## API development (Python 3.12)
 
+FastAPI runs in `.venv-api`; its TTS service loads the existing Kokoro packages and model assets from `.venv312`, so no duplicate model install is needed.
+
 ```powershell
-py -3.12 -m venv .venv-api
-.\.venv-api\Scripts\python.exe -m pip install -r services/api/requirements.lock
 $env:PYTHONPATH = (Resolve-Path services/api).Path
-\.venv-api\Scripts\uvicorn.exe app.main:app --app-dir services/api --host 127.0.0.1 --port 8000
+$env:VOLVOX_ENVIRONMENT = "development"
+$env:VOLVOX_LOCAL_DEV_AUTH_BYPASS = "true"
+\.venv-api\Scripts\python.exe -m uvicorn app.main:app --app-dir services/api --host 127.0.0.1 --port 8000
 ```
+
+Apply the schema migration before using saved presets:
+
+```powershell
+$env:PYTHONPATH = (Resolve-Path services/api).Path
+\.venv-api\Scripts\alembic.exe -c services/api/alembic.ini upgrade head
+```
+
+For your private local dashboard, set `$env:VOLVOX_ENVIRONMENT="development"` and `$env:VOLVOX_LOCAL_DEV_AUTH_BYPASS="true"` before API startup. The API creates an ignored `.volvox-local.db` with your personal workspace. No dashboard sign-in is shown or required. The bypass only accepts loopback requests in development; production API routes continue to require Supabase authentication and tenant membership.
+
+Start Ollama locally and load the model:
+
+```powershell
+ollama serve
+ollama pull llama3.2:3b
+```
+
+The Voice Studio uses `POST /v1/organizations/{organization_id}/speech` and returns `audio/wav`; typed chat uses local Ollama at `http://127.0.0.1:11434`. No microphone or media transport is used.
 
 Health routes: `GET /health/live` and `GET /health/ready`. Readiness performs `SELECT 1` and returns 503 when the configured database is unreachable. Copy `.env.example` to `services/api/.env` and fill local PostgreSQL credentials before starting. For local iteration without Docker, set `VOLVOX_DATABASE_URL` to an absolute SQLite URL, for example `sqlite:///C:/Users/you/volvox-local.db`; SQLite is for local development only. Alembic reads `VOLVOX_DATABASE_URL` directly when provided.
 
@@ -68,20 +88,32 @@ $env:PYTHONPATH = (Resolve-Path services/api).Path
 
 The integration suite intentionally drops and recreates the configured database's `public` schema. Point it only at a disposable local test DB. The integration migration test expects an empty database. The current session generated PostgreSQL migration SQL offline but did not apply it because Docker/PostgreSQL was unavailable.
 
-The repository's existing smoke scripts use local Ollama, model files, or microphone hardware and are not part of GPU-independent CI. CI checks the API and schema only.
+The repository's existing voice-agent smoke command uses local Ollama and native Python dependencies; it is separate from the API test suite.
 
 ## Dashboard (Next.js, Node.js)
 
-The dashboard lives in [apps/web](apps/web/README.md), uses Next.js App Router, and calls the API through server routes. Start the API first, then in another PowerShell terminal:
+The dashboard lives in [apps/web](apps/web/README.md), uses Next.js App Router, and calls the API through same-origin server routes. Start the API first, then in another PowerShell terminal:
 
 ```powershell
 Set-Location apps/web
 npm ci
-Copy-Item .env.example .env.local
+$env:VOLVOX_LOCAL_DEV = "true"
+$env:VOLVOX_API_URL = "http://127.0.0.1:8000"
 npm run dev
 ```
 
-The UI is available at `http://127.0.0.1:3000`. Supabase URL and anon/publishable key are required for real sign-in; no credentials are checked in. Without a connected identity/API, the dashboard presents explicitly labeled preview agent configurations and does not invent call, usage, or billing data. See `apps/web/README.md` for the authentication flow and limitations.
+### One-command localhost startup (Windows)
+
+Install dashboard dependencies once with `Set-Location apps/web; npm ci`, then return to the repository root and run:
+
+```powershell
+Set-Location C:\Users\hassa\Desktop\volvox-voice-agent
+.\start-volvox.ps1
+```
+
+The script checks for existing local services, starts Ollama if needed, launches FastAPI with `.venv-api` (which loads the installed Kokoro packages from `.venv312`), and starts Next.js. It keeps all listeners on loopback and enables the isolated auth bypass only for development. Dashboard URL: `http://127.0.0.1:3000`. Stop only the process trees started by the script with `.\stop-volvox.ps1`; logs and PID records are stored in the ignored `.volvox-runtime` directory. If the model is missing, install it with `ollama pull llama3.2:3b` before chatting. To start without a dashboard, run `.\start-volvox.ps1 -NoDashboard`.
+
+The UI is available at `http://127.0.0.1:3000`. Local personal development uses a private localhost-only identity and does not need Supabase. Production API routes continue to require verified tokens and tenant membership. Calls and analytics are omitted from the active text-first interface.
 
 Dashboard checks:
 
@@ -93,7 +125,9 @@ npm run typecheck
 npm run build
 ```
 
-The API startup and migration were verified with local SQLite because this host's Docker engine is inaccessible. Do not treat SQLite validation as the PostgreSQL integration run; the PostgreSQL migration and two destructive-schema integration tests remain pending. The current host also returns `spawn EPERM` when Node attempts to start a child process, blocking Next dev/build runtime here.
+For the isolated local browser demo, set `VOLVOX_ENVIRONMENT=development` and `VOLVOX_LOCAL_DEV_AUTH_BYPASS=true` in the API terminal before startup. The API provisions one local owner/workspace in the ignored `.volvox-local.db`; the bypass accepts only loopback requests in development.
+
+The API and tests were verified against local SQLite; PostgreSQL integration remains separate. The Next.js production build and dashboard lint/type checks pass.
 
 ## Operations, security, and rollback
 
@@ -106,4 +140,4 @@ The API startup and migration were verified with local SQLite because this host'
 
 ## Current limitations
 
-No Redis jobs, metering, billing, telephony, recording, production metrics, external Supabase provisioning/webhook, browser media transport, or Linux voice validation has been delivered. The dashboard provides Supabase password login but does not manage users; an operator must provision the matching `auth_subject` in `users` before API access. Supabase token refresh is not implemented in the dashboard session. The checked-in Python dependency lock contains resolved version pins but is not hash-locked; generate a hash-enforced release lock and validate platform wheels before production use. PostgreSQL constraints and the cross-tenant tests must still be run against PostgreSQL before launch.
+No Redis jobs, metering, billing, telephony, recording, production metrics, browser media transport, or Linux voice validation has been delivered. The dashboard has no sign-in/sign-up screen for local use; production API routes still require verified tokens, provisioned users, and tenant membership. Supabase token refresh is not implemented in the dashboard session. The checked-in Python dependency lock contains resolved version pins but is not hash-locked; generate a hash-enforced release lock and validate platform wheels before production use. PostgreSQL constraints and the cross-tenant tests must still be run against PostgreSQL before launch.

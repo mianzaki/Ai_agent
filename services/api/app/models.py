@@ -2,12 +2,14 @@
 
 import uuid
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import (
     JSON,
     Boolean,
     CheckConstraint,
     DateTime,
+    Float,
     ForeignKey,
     ForeignKeyConstraint,
     Integer,
@@ -58,7 +60,7 @@ class Agent(Base):
     )
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     instructions: Mapped[str] = mapped_column(Text, nullable=False, default="")
-    config: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    config: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -104,7 +106,7 @@ class Event(Base):
     session_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, index=True)
     sequence: Mapped[int] = mapped_column(Integer, nullable=False)
     kind: Mapped[str] = mapped_column(String(64), nullable=False)
-    payload: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -130,3 +132,15 @@ class Membership(Base):
     auth_subject: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[str] = mapped_column(String(32), nullable=False, default="viewer")
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+
+class VoiceSetting(Base):
+    __tablename__ = "voice_settings"
+    __table_args__ = (UniqueConstraint("organization_id", "agent_id", name="uq_voice_setting_org_agent"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    agent_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    voice_id: Mapped[str] = mapped_column(String(64), nullable=False, default="af_sarah")
+    language: Mapped[str] = mapped_column(String(16), nullable=False, default="en-us")
+    speed: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)

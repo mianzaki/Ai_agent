@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -19,14 +20,14 @@ class OrganizationRead(BaseModel):
 class AgentCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     instructions: str = Field(default="", max_length=20000)
-    config: dict = Field(default_factory=dict)
+    config: dict[str, Any] = Field(default_factory=dict)
     enabled: bool = True
 
 
 class AgentUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
     instructions: str | None = Field(default=None, max_length=20000)
-    config: dict | None = None
+    config: dict[str, Any] | None = None
     enabled: bool | None = None
 
 
@@ -37,6 +38,6 @@ class AgentRead(BaseModel):
     organization_id: uuid.UUID
     name: str
     instructions: str
-    config: dict
+    config: dict[str, Any]
     enabled: bool
     created_at: datetime

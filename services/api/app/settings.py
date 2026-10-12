@@ -14,7 +14,9 @@ class Settings(BaseSettings):
 
     environment: str = "development"
     database_url: str = "postgresql+psycopg://volvox:volvox@localhost:5432/volvox"
-    ollama_base_url: str = "http://127.0.0.1:11434/v1"
+    local_dev_auth_bypass: bool = False
+    chat_model: str = "llama3.2:3b"
+    ollama_host: str = "http://127.0.0.1:11434"
     api_bind_host: str = "127.0.0.1"
     api_bind_port: int = Field(default=8000, ge=1, le=65535)
     log_level: str = "INFO"

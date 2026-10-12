@@ -33,6 +33,7 @@ export type DashboardData = {
     api: ServiceState;
     database: ServiceState;
     supabase: ServiceState;
+    ollama: ServiceState;
     apiAuthenticated?: boolean | null;
     voice: ServiceState;
   };

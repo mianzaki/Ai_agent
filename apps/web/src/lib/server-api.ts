@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { NextRequest } from "next/server";
 import { cookies } from "next/headers";
 import type { Agent, AgentCreate, AgentUpdate, Organization } from "./contracts";
 import { ApiError } from "./contracts";
@@ -9,8 +10,9 @@ const API_URL = process.env.VOLVOX_API_URL?.replace(/\/$/, "");
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!API_URL) throw new ApiError("VOLVOX_API_URL is not configured.", 503);
   const cookieStore = await cookies();
-  const token = cookieStore.get("volvox_access_token")?.value;
-  if (!token) throw new ApiError("Sign in with Supabase to connect your workspace.", 401);
+  const token = cookieStore.get("volvox_access_token")?.value ??
+    (process.env.NODE_ENV !== "production" && process.env.VOLVOX_LOCAL_DEV === "true" ? "local-development" : undefined);
+  if (!token) throw new ApiError("Workspace access is not configured.", 401);
   const response = await fetch(`${API_URL}${path}`, {
     ...init,
     cache: "no-store",
@@ -48,3 +50,31 @@ export const serverApi = {
       { method: "DELETE" },
     ),
 };
+
+export async function directLocalApi(path: string, init?: RequestInit): Promise<Response> {
+  if (process.env.NODE_ENV === "production" || process.env.VOLVOX_LOCAL_DEV !== "true") {
+    throw new ApiError("Local development access is disabled.", 403);
+  }
+  if (!API_URL) throw new ApiError("VOLVOX_API_URL is not configured.", 503);
+  return fetch(`${API_URL}${path}`, {
+    ...init,
+    cache: "no-store",
+    headers: { authorization: "Bearer local-development", ...init?.headers },
+  });
+}
+
+export function isSameOrigin(request: NextRequest): boolean {
+  const origin = request.headers.get("origin");
+  if (!origin) return true;
+  try {
+    const requestOrigin = new URL(origin).origin;
+    const forwardedProtocol = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
+    const protocol = forwardedProtocol ? `${forwardedProtocol}:` : request.nextUrl.protocol;
+    const host = request.headers.get("host");
+    const candidates = new Set([request.url ? new URL(request.url).origin : "", request.nextUrl.origin]);
+    if (protocol && host) candidates.add(new URL(`${protocol}//${host}`).origin);
+    return candidates.has(requestOrigin);
+  } catch {
+    return false;
+  }
+}

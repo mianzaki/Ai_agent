@@ -13,6 +13,8 @@ services/api/.venv/
 .test-volvox-*.db
 *.db
 *.sqlite
+.volvox-local.db
+.volvox-runtime/
 .tmp/
 pytest-cache-files-*/
 models/**
