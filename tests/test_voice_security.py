@@ -23,6 +23,11 @@ def test_voice_origin_is_exact(origin, allowed):
     assert allowed_voice_origin(origin, "http://127.0.0.1:3000") is allowed
 
 
+def test_silent_microphone_audio_does_not_load_whisper(monkeypatch):
+    monkeypatch.setattr(voice_conversation, "_whisper_model", lambda: pytest.fail("Whisper should not run on silence"))
+    assert voice_conversation._transcribe(bytes(32000)) == ("", 0.0, 0.0)
+
+
 def test_voice_ticket_is_tenant_scoped_and_one_use(api_client, identities, test_db, monkeypatch):
     monkeypatch.setenv("VOLVOX_LOCAL_DEV_AUTH_BYPASS", "true")
     monkeypatch.setattr(voice_conversation, "voice_models_available", lambda _service: True)

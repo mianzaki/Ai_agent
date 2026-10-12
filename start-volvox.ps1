@@ -71,8 +71,10 @@ if ($apiListening) {
     } catch { throw "The existing API is not configured for the local development identity. Stop it and rerun this script, or start it with VOLVOX_LOCAL_DEV_AUTH_BYPASS=true." }
 }
 if (-not $apiListening) {
-    $python = Join-Path $root ".venv-api\Scripts\python.exe"
+    $python = Join-Path $root ".venv312\Scripts\python.exe"
     if (-not (Test-Path -LiteralPath $python)) { throw "Python environment not found: $python" }
+    & $python -c "import fastapi, sqlalchemy, faster_whisper, kokoro_onnx, pipecat; from pipecat.audio.vad.silero import SileroVADAnalyzer"
+    if ($LASTEXITCODE -ne 0) { throw "The voice API environment is incomplete. Install services/api/requirements.in and requirements-speech.txt into .venv312." }
     $env:VOLVOX_ENVIRONMENT = "development"
     $env:VOLVOX_LOCAL_DEV_AUTH_BYPASS = "true"
     $env:VOLVOX_DATABASE_URL = "postgresql+psycopg://volvox:volvox@localhost:5432/volvox"

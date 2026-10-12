@@ -13,6 +13,7 @@ import threading
 import time
 import uuid
 from dataclasses import dataclass
+from importlib.util import find_spec
 from pathlib import Path
 from typing import Any
 
@@ -54,7 +55,7 @@ def allowed_voice_origin(origin: str | None, expected: str) -> bool:
 
 
 def voice_models_available(service: Any) -> bool:
-    return bool(service.voices) and any((ROOT / "models" / "whisper").rglob("model.bin"))
+    return bool(service.voices) and any((ROOT / "models" / "whisper").rglob("model.bin")) and all(find_spec(name) is not None for name in ("faster_whisper", "pipecat"))
 
 
 def _whisper_model() -> Any:
@@ -67,12 +68,18 @@ def _whisper_model() -> Any:
     return _whisper
 
 
-def _transcribe(audio: bytes) -> str:
+def _transcribe(audio: bytes) -> tuple[str, float, float]:
     np = importlib.import_module("numpy")
 
     samples = np.frombuffer(audio, dtype="<i2").astype(np.float32) / 32768.0
-    segments, _ = _whisper_model().transcribe(samples, language="en", beam_size=5, vad_filter=True)
-    return " ".join(segment.text.strip() for segment in segments).strip()
+    peak = float(np.max(np.abs(samples)))
+    rms = float(np.sqrt(np.mean(np.square(samples))))
+    if peak < 0.003 and rms < 0.0005:
+        return "", peak, rms
+    # The browser or Silero already delimits each utterance. A second VAD pass
+    # can discard a short, quiet manual turn before Whisper sees it.
+    segments, _ = _whisper_model().transcribe(samples, language="en", beam_size=5, vad_filter=False)
+    return " ".join(segment.text.strip() for segment in segments).strip(), peak, rms
 
 
 @router.post("/organizations/{organization_id}/voice-session")
@@ -189,9 +196,11 @@ async def voice_socket(websocket: WebSocket) -> None:
         timestamps: dict[str, float] = {"start": time.monotonic()}
         try:
             await send({"type": "state", "state": "thinking", "turn": turn})
-            transcript = await asyncio.wait_for(asyncio.to_thread(_transcribe, pcm), timeout=40)
+            transcript, peak, rms = await asyncio.wait_for(asyncio.to_thread(_transcribe, pcm), timeout=40)
             if not transcript:
-                await send({"type": "error", "message": "No speech was recognized. Please try again.", "turn": turn})
+                logger.info("voice_turn_no_speech", extra={"session_id": session_id, "audio_peak": round(peak, 4), "audio_rms": round(rms, 4), "audio_seconds": round(len(pcm) / (SAMPLE_RATE * 2), 2)})
+                message = "The selected microphone sent silence. Choose another microphone and try again." if peak < 0.003 and rms < 0.0005 else "No speech was recognized. Speak closer to the selected microphone and try again."
+                await send({"type": "error", "message": message, "turn": turn})
                 return
             timestamps["transcribed"] = time.monotonic()
             if turn != serial:

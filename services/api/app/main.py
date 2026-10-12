@@ -18,6 +18,7 @@ from app.models import Base, Membership, Organization, User
 from app.routes import router
 from app.settings import get_settings
 from app.voice_conversation import router as voice_router
+from app.voice_conversation import voice_models_available
 
 settings = get_settings()
 configure_logging(settings.log_level)
@@ -114,8 +115,7 @@ async def ready() -> dict[str, str] | Response:
 async def services() -> dict[str, str]:
     kokoro = getattr(app.state, "kokoro", None)
     voice = "connected" if kokoro is not None and bool(kokoro.voices) else "unavailable"
-    whisper_cache = Path(__file__).resolve().parents[3] / "models" / "whisper"
-    voice_transport = "configured" if settings.environment == "development" and settings.local_dev_auth_bypass and voice == "connected" and any(whisper_cache.rglob("model.bin")) else "unavailable"
+    voice_transport = "configured" if settings.environment == "development" and settings.local_dev_auth_bypass and kokoro is not None and voice_models_available(kokoro) else "unavailable"
     try:
         import httpx
 

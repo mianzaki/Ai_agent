@@ -35,6 +35,9 @@ export function VoiceConversation({ organization, agents }: { organization: Orga
   const [hasAudio, setHasAudio] = useState(false);
   const [answerUrl, setAnswerUrl] = useState("");
   const [connected, setConnected] = useState(false);
+  const [microphones, setMicrophones] = useState<MediaDeviceInfo[]>([]);
+  const [microphoneId, setMicrophoneId] = useState("");
+  const [inputLevel, setInputLevel] = useState(0);
   const socket = useRef<WebSocket | null>(null);
   const media = useRef<MediaStream | null>(null);
   const context = useRef<AudioContext | null>(null);
@@ -44,6 +47,14 @@ export function VoiceConversation({ organization, agents }: { organization: Orga
   const automaticRef = useRef(false);
   const mutedRef = useRef(false);
   const sessionRef = useRef(false);
+  const lastLevelUpdate = useRef(0);
+  const turnPeak = useRef(0);
+  const turnFrames = useRef(0);
+
+  const refreshMicrophones = async () => {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    setMicrophones(devices.filter((device) => device.kind === "audioinput"));
+  };
 
   const stop = () => {
     sessionRef.current = false;
@@ -60,9 +71,21 @@ export function VoiceConversation({ organization, agents }: { organization: Orga
     setHasAudio(false);
     setAnswerUrl("");
     setConnected(false); setState("idle");
+    setInputLevel(0);
   };
 
   useEffect(() => () => stop(), []);
+  useEffect(() => {
+    if (!navigator.mediaDevices?.enumerateDevices) return;
+    const update = () => {
+      void navigator.mediaDevices.enumerateDevices().then((devices) => {
+        setMicrophones(devices.filter((device) => device.kind === "audioinput"));
+      }).catch(() => undefined);
+    };
+    update();
+    navigator.mediaDevices.addEventListener("devicechange", update);
+    return () => navigator.mediaDevices.removeEventListener("devicechange", update);
+  }, []);
   useEffect(() => {
     if (answerUrl && player.current) {
       void player.current.play().catch(() => setError("Browser autoplay was blocked. Use the audio controls to play the answer."));
@@ -74,8 +97,9 @@ export function VoiceConversation({ organization, agents }: { organization: Orga
     setError(""); setLines([]); setState("connecting");
     try {
       if (location.origin !== "http://127.0.0.1:3000") throw new Error("Open the dashboard at http://127.0.0.1:3000 for local microphone access.");
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 }, video: false });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: { deviceId: microphoneId ? { exact: microphoneId } : undefined, echoCancellation: true, noiseSuppression: true, channelCount: 1 }, video: false });
       media.current = stream;
+      await refreshMicrophones();
       const audioContext = new AudioContext({ sampleRate: 16000 });
       context.current = audioContext;
       if (audioContext.sampleRate !== 16000) throw new Error("This browser cannot capture 16 kHz microphone audio.");
@@ -85,6 +109,18 @@ export function VoiceConversation({ organization, agents }: { organization: Orga
       const silent = audioContext.createGain(); silent.gain.value = 0;
       audioContext.createMediaStreamSource(stream).connect(node); node.connect(silent); silent.connect(audioContext.destination);
       node.port.onmessage = (event: MessageEvent<ArrayBuffer>) => {
+        const samples = new Int16Array(event.data);
+        let peak = 0;
+        for (const sample of samples) peak = Math.max(peak, Math.abs(sample));
+        const normalizedPeak = peak / 32768;
+        if (recordingRef.current) {
+          turnPeak.current = Math.max(turnPeak.current, normalizedPeak);
+          turnFrames.current += samples.length;
+        }
+        if (performance.now() - lastLevelUpdate.current > 120) {
+          setInputLevel(mutedRef.current ? 0 : normalizedPeak);
+          lastLevelUpdate.current = performance.now();
+        }
         const active = socket.current;
         if (active?.readyState === WebSocket.OPEN && !mutedRef.current && (automaticRef.current || recordingRef.current) && active.bufferedAmount < 128000) active.send(event.data);
       };
@@ -131,8 +167,12 @@ export function VoiceConversation({ organization, agents }: { organization: Orga
     if (!connected || automatic) return;
     if (recordingRef.current) {
       recordingRef.current = false; setRecording(false);
+      if (turnFrames.current >= 8000 && turnPeak.current < 0.003) {
+        setError("This microphone is sending silence. Select another microphone above, then start a new conversation.");
+      }
       socket.current?.send(JSON.stringify({ type: "turn_end" })); setState("thinking");
     } else {
+      setError(""); turnPeak.current = 0; turnFrames.current = 0;
       player.current?.pause();
       socket.current?.send(JSON.stringify({ type: "interrupt" }));
       recordingRef.current = true; setRecording(true); setState("listening");
@@ -144,6 +184,8 @@ export function VoiceConversation({ organization, agents }: { organization: Orga
       <h2>Talk to a saved agent</h2>
       <p>Your microphone audio stays in memory during this session. Volvox uses local Whisper, Ollama, and Kokoro.</p>
       <label className="studio-field"><span>Agent</span><select value={agentId} disabled={connected} onChange={(event) => setAgentId(event.target.value)}><option value="">Choose an agent</option>{agents.filter((agent) => agent.enabled).map((agent) => <option key={agent.id} value={agent.id}>{agent.name}</option>)}</select></label>
+      <label className="studio-field"><span>Microphone</span><select value={microphoneId} disabled={connected} onChange={(event) => setMicrophoneId(event.target.value)}><option value="">Windows default microphone</option>{microphones.filter((device) => device.deviceId && device.deviceId !== "default").map((device, index) => <option key={device.deviceId} value={device.deviceId}>{device.label || `Microphone ${index + 1}`}</option>)}</select></label>
+      {connected && <div className="conversation-input-meter" aria-label={`Microphone input level ${Math.round(inputLevel * 100)} percent`}><span>Mic level</span><div><i style={{ width: `${Math.min(100, inputLevel * 350)}%` }} /></div><span>{inputLevel < 0.003 ? "No signal" : "Signal detected"}</span></div>}
       {!agents.some((agent) => agent.enabled) && <p>Create an agent on the AI Agents page to begin.</p>}
       <label className="conversation-check"><input type="checkbox" checked={automatic} disabled={connected} onChange={(event) => { setAutomatic(event.target.checked); automaticRef.current = event.target.checked; }} /> Automatic turn detection (Silero VAD)</label>
       <div className="conversation-actions"><button className="btn btn-primary" disabled={connected || state === "connecting" || !agentId} onClick={() => void start()} type="button">Start Conversation</button><button className="btn" disabled={!connected} onClick={stop} type="button">Stop Conversation</button></div>
