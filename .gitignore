@@ -21,6 +21,8 @@ models/**
 !models/.gitkeep
 artifacts/**
 !artifacts/.gitkeep
+# Generated demo audio from the telephony simulator
+*.wav
 .next/
 node_modules/
 dist/

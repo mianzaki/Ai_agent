@@ -1,0 +1,6 @@
+# Telephony demo — extra deps beyond the repo's local voice stack.
+# Install into the same environment that already has the speech stack
+# (see requirements-speech.txt: faster-whisper, kokoro-onnx, numpy, soundfile,
+# requests, websockets — all reused here).
+fastapi>=0.115
+uvicorn[standard]>=0.30

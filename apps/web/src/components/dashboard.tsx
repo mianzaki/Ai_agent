@@ -17,7 +17,7 @@ const navigation: { page: Page; icon: typeof AudioLines }[] = [
 
 export function Dashboard() {
   const [page, setPage] = useState<Page>("Voice Conversation");
-  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [theme, setTheme] = useState<"light" | "dark">("dark");
   const [organization, setOrganization] = useState<Organization>({ id: "", name: "Loading workspace…", created_at: "" });
   const [agents, setAgents] = useState<Agent[]>([]);
   const [services, setServices] = useState<DashboardData["services"]>(previewDashboard.services);

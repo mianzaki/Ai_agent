@@ -23,6 +23,11 @@ DEFAULT_INPUT_WAV = ROOT / "artifacts" / "push-to-talk-input.wav"
 
 def play_response(path: Path) -> None:
     """Play the completed WAV through the default Windows output device."""
+    if sys.platform == "darwin":
+        import subprocess
+
+        subprocess.run(["afplay", str(path.resolve())], check=True)
+        return
     try:
         import winsound
 
